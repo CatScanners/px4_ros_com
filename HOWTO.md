@@ -6,7 +6,7 @@ MicroXRCEAgent udp4 -p 8888
 ## PREREQ: Run Gazebo simulation
 ```bash
 cd PX4-Autopilot
-make px4_sitl gz_x500
+HEADLESS=1 make px4_sitl gz_x500 # headless if you don't have gui
 ```
 
 ## PREREQ: Source setup files
