@@ -36,6 +36,9 @@
  * @addtogroup examples
  * @author Mickey Cowden <info@cowden.tech>
  * @author Nuno Marques <nuno.marques@dronesolutions.io>
+ * @modified_by CatScanners <https://github.com/CatScanners/find-my-kitten>
+ * @date 2025-02-03
+ * @details Subscribes to a trajectory publisher and sends setpoints via publish_trajectory_setpoint()
  */
 
 #include <px4_msgs/msg/offboard_control_mode.hpp>
@@ -57,15 +60,21 @@ class OffboardControl : public rclcpp::Node
 public:
 	OffboardControl() : Node("offboard_control")
 	{
-
 		offboard_control_mode_publisher_ = this->create_publisher<OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
 		trajectory_setpoint_publisher_ = this->create_publisher<TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
 		vehicle_command_publisher_ = this->create_publisher<VehicleCommand>("/fmu/in/vehicle_command", 10);
 
-		offboard_setpoint_counter_ = 0;
+		// Creating a subscription for custom navigation.
+		custom_trajectory_subscription_ = this->create_subscription<TrajectorySetpoint>(
+			"/custom_trajectory",
+			10,
+			[this](const TrajectorySetpoint::SharedPtr msg) {
+				current_trajectory_setpoint_ = *msg;
+				RCLCPP_INFO(this->get_logger(), "Received trajectory: [%.2f, %.2f, %.2f]",
+							msg->position[0], msg->position[1], msg->position[2]);
+		});
 
 		auto timer_callback = [this]() -> void {
-
 			if (offboard_setpoint_counter_ == 10) {
 				// Change to Offboard mode after 10 setpoints
 				this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
@@ -95,10 +104,11 @@ private:
 	rclcpp::Publisher<OffboardControlMode>::SharedPtr offboard_control_mode_publisher_;
 	rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_setpoint_publisher_;
 	rclcpp::Publisher<VehicleCommand>::SharedPtr vehicle_command_publisher_;
+	rclcpp::Subscription<TrajectorySetpoint>::SharedPtr custom_trajectory_subscription_;
 
 	std::atomic<uint64_t> timestamp_;   //!< common synced timestamped
-
 	uint64_t offboard_setpoint_counter_;   //!< counter for the number of setpoints sent
+	TrajectorySetpoint current_trajectory_setpoint_; //!< next setpoint, where the drone should be.
 
 	void publish_offboard_control_mode();
 	void publish_trajectory_setpoint();
@@ -143,16 +153,17 @@ void OffboardControl::publish_offboard_control_mode()
 
 /**
  * @brief Publish a trajectory setpoint
- *        For this example, it sends a trajectory setpoint to make the
- *        vehicle hover at 5 meters with a yaw angle of 180 degrees.
  */
 void OffboardControl::publish_trajectory_setpoint()
 {
-	TrajectorySetpoint msg{};
-	msg.position = {0.0, 0.0, -5.0};
-	msg.yaw = -3.14; // [-PI:PI]
-	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
-	trajectory_setpoint_publisher_->publish(msg);
+	if (current_trajectory_setpoint_.position.size() == 3) { // x, y and z coordinate received.
+		/* RCLCPP_INFO(this->get_logger(), "Published trajectory: [%.2f, %.2f, %.2f]",
+                    current_trajectory_setpoint_.position[0], current_trajectory_setpoint_.position[1], current_trajectory_setpoint_.position[2]); */
+		current_trajectory_setpoint_.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+		trajectory_setpoint_publisher_->publish(current_trajectory_setpoint_);
+	} else {
+		RCLCPP_WARN(this->get_logger(), "No valid trajectory setpoint received!");
+	}
 }
 
 /**
