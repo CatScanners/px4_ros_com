@@ -5,12 +5,18 @@ MicroXRCEAgent udp4 -p 8888
 
 ## PREREQ: Run Gazebo simulation
 ```bash
-make px4_sitl gz_x500
+cd PX4-Autopilot
+HEADLESS=1 make px4_sitl gz_x500 # headless if you don't have gui
 ```
 
 ## PREREQ: Source setup files
 ```bash
 source install/setup.bash
+```
+
+## PREREQ: Build PX4_ros_com package (might have to source ROS first)
+```bash
+colcon build --packages-select <pckg-name>
 ```
 
 ## Run flight example
