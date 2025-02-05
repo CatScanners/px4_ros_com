@@ -62,25 +62,18 @@ class OffboardControl : public rclcpp::Node
 public:
 	OffboardControl() : Node("offboard_control")
 	{
-
+		// Initial variables
 		rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
 		auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
-		subscription_ = this->create_subscription<px4_msgs::msg::SensorGps>("/fmu/out/vehicle_gps_position", qos,std::bind(&OffboardControl::vehicle_gps_callback, this, std::placeholders::_1));
-		std::cout << "Listening to gps" << std::endl;
 
 		offboard_control_mode_publisher_ = this->create_publisher<OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
 		trajectory_setpoint_publisher_ = this->create_publisher<TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
 		vehicle_command_publisher_ = this->create_publisher<VehicleCommand>("/fmu/in/vehicle_command", 10);
 
-		// Creating a subscription for custom navigation.
-		custom_trajectory_subscription_ = this->create_subscription<TrajectorySetpoint>(
-			"/custom_trajectory",
-			10,
-			[this](const TrajectorySetpoint::SharedPtr msg) {
-				current_trajectory_setpoint_ = *msg;
-				RCLCPP_INFO(this->get_logger(), "Received trajectory: [%.2f, %.2f, %.2f]",
-							msg->position[0], msg->position[1], msg->position[2]);
-		});
+		// Subsribe to our setpoints
+		custom_trajectory_subscription_ = this->create_subscription<TrajectorySetpoint>("/custom_trajectory", 10, std::bind(&OffboardControl::trajectory_setpoint_callback, this, std::placeholders::_1));
+		// Subscribe to the GPS from PX4
+		subscription_ = this->create_subscription<px4_msgs::msg::SensorGps>("/fmu/out/vehicle_gps_position", qos,std::bind(&OffboardControl::vehicle_gps_callback, this, std::placeholders::_1));
 
 		// Listen to setpoints from other nodes
 		
@@ -134,7 +127,18 @@ private:
 
 	void vehicle_gps_callback(const px4_msgs::msg::SensorGps::UniquePtr msg)
 	{
+		// Attributes of SensorGPS here please check https://github.com/PX4/px4_msgs/blob/main/msg/SensorGps.msg
 		std::cout << "alt: " << msg->altitude_msl_m  << std::endl;
+		std::cout << "lat: " << msg->latitude_deg  << std::endl;
+		std::cout << "lon: " << msg->longitude_deg << std::endl;
+		std::cout << "vel_m_s: " << msg->vel_m_s << std::endl;
+	}
+
+	void trajectory_setpoint_callback(const TrajectorySetpoint::SharedPtr msg)
+	{
+		current_trajectory_setpoint_ = *msg;
+		RCLCPP_INFO(this->get_logger(), "Received trajectory: [%.2f, %.2f, %.2f]",
+					msg->position[0], msg->position[1], msg->position[2]);
 	}
 
 };
