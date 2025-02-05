@@ -35,3 +35,8 @@ Run example code that should raise the drone to 500m.
 ```bash
 ros2 run px4_ros_com offboard_control
 ```
+
+Run ros2 commands on demand:
+```bash
+ros2 topic pub /custom_trajectory px4_msgs/msg/TrajectorySetpoint "{ position: [ 0.0, 0.0, -50.0 ], velocity: [0.0, 0.0, 0.0],  yaw: -3.14 }"
+```

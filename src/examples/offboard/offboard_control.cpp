@@ -185,6 +185,7 @@ void OffboardControl::publish_offboard_control_mode()
  */
 void OffboardControl::publish_trajectory_setpoint()
 {
+	// LOOK AT WAYPOINTS: https://github.com/PX4/px4_msgs/blob/main/msg/TrajectoryWaypoint.msg
 	if (current_trajectory_setpoint_.position.size() == 3) { // x, y and z coordinate received.
 		/* RCLCPP_INFO(this->get_logger(), "Published trajectory: [%.2f, %.2f, %.2f]",
                     current_trajectory_setpoint_.position[0], current_trajectory_setpoint_.position[1], current_trajectory_setpoint_.position[2]); */
@@ -214,6 +215,7 @@ void OffboardControl::publish_vehicle_command(uint16_t command, float param1, fl
 	msg.from_external = true;
 	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
 	vehicle_command_publisher_->publish(msg);
+	// Check if successfull? https://docs.px4.io/main/en/msg_docs/VehicleCommandAck.html
 }
 
 int main(int argc, char *argv[])
