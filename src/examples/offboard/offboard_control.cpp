@@ -59,14 +59,20 @@ class OffboardControl : public rclcpp::Node
 public:
 	OffboardControl() : Node("offboard_control")
 	{
+		trajectory_setpoint_listener_ = this->create_subscription<std_msgs::msg::String>("command", 10, std::bind(&OffboardControl::command_callback, this, std::placeholders::_1));
+		std::cout << "Trajectory setpoint listener created" << std::endl;
+
+		rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
+		auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
+		subscription_ = this->create_subscription<px4_msgs::msg::SensorGps>("/fmu/out/vehicle_gps_position", qos,std::bind(&OffboardControl::vehicle_gps_callback, this, std::placeholders::_1));
+		std::cout << "Listening to gps" << std::endl;
 
 		offboard_control_mode_publisher_ = this->create_publisher<OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
 		trajectory_setpoint_publisher_ = this->create_publisher<TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
 		vehicle_command_publisher_ = this->create_publisher<VehicleCommand>("/fmu/in/vehicle_command", 10);
 
 		// Listen to setpoints from other nodes
-		trajectory_setpoint_listener_ = this->create_subscription<std_msgs::msg::String>("command", 10, std::bind(&OffboardControl::command_callback, this, std::placeholders::_1));
-
+		
 		offboard_setpoint_counter_ = 0;
 
 		auto timer_callback = [this]() -> void {
@@ -76,7 +82,6 @@ public:
 			if (offboard_setpoint_counter_ == 10) {
 				// Change to Offboard mode after 10 setpoints
 				this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
-
 				// Arm the vehicle
 				this->arm();
 			}
@@ -90,16 +95,7 @@ public:
 				offboard_setpoint_counter_++;
 			}
 
-			rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
-			auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
 			
-			// Print the altitude
-			subscription_ = this->create_subscription<px4_msgs::msg::SensorGps>("/fmu/out/vehicle_gps_position", qos,
-			[this](const px4_msgs::msg::SensorGps::UniquePtr msg) {
-				std::cout << "\n";
-				std::cout << "alt: " << msg->altitude_msl_m  << std::endl;
-			});
-
 		};
 		timer_ = this->create_wall_timer(100ms, timer_callback);
 	}
@@ -118,18 +114,34 @@ private:
 	std::atomic<uint64_t> timestamp_;   //!< common synced timestamped
 
 	uint64_t offboard_setpoint_counter_;   //!< counter for the number of setpoints sent
+	float current_trajectory_altitude_ = 0; // current trajectory setpoint that we are sending
+	bool gps_toggle = false;
+
 
 	void publish_offboard_control_mode();
 	void publish_trajectory_setpoint();
 	void publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0);
 
+	void vehicle_gps_callback(const px4_msgs::msg::SensorGps::UniquePtr msg)
+	{
+		this->gps_toggle = !this->gps_toggle; // print every second time only
+		if (this->gps_toggle) {
+			std::cout << "alt: " << msg->altitude_msl_m  << std::endl;
+
+		}
+	}
+
 	// callback method for published commands
 	void command_callback(const std_msgs::msg::String::SharedPtr msg)
     {
-      RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg->data.c_str());
-	  //float new_height = std::stof(msg->data.c_str());
-	  //this->publish_offboard_control_mode();
-	  // this->publish_trajectory_setpoint(new_height);
+      //RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg->data.c_str());
+	  RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg->data.c_str());
+	  float new_altitude = std::stof(msg->data.c_str());
+	  this->current_trajectory_altitude_ = new_altitude;
+
+	  std::cout << new_altitude << std::endl;
+	  this->publish_offboard_control_mode();
+	  this->publish_trajectory_setpoint();
     }
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr trajectory_setpoint_listener_;
 
@@ -180,7 +192,7 @@ void OffboardControl::publish_offboard_control_mode()
 void OffboardControl::publish_trajectory_setpoint()
 {
 	TrajectorySetpoint msg{};
-	msg.position = {0.0, 0.0, -5.0};
+	msg.position = {0.0, 0.0, this->current_trajectory_altitude_};
 	msg.yaw = -3.14; // [-PI:PI]
 	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
 	trajectory_setpoint_publisher_->publish(msg);

@@ -27,14 +27,13 @@ class OffboardPublisher : public rclcpp::Node
   private:
     void timer_callback()
     {
-      
       std::random_device rd;
       std::mt19937 gen(rd());
-      std::uniform_real_distribution<> dis(0, 10);
+      std::uniform_real_distribution<> dis(10, 100);
       float random_value = dis(gen);
 
       auto message = std_msgs::msg::String();
-      message.data = std::to_string(random_value);
+      message.data = std::to_string(random_value); // Publish a random float value 0-10
       RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
       publisher_->publish(message);
     }

@@ -9,14 +9,14 @@ cd PX4-Autopilot
 HEADLESS=1 make px4_sitl gz_x500 # headless if you don't have gui
 ```
 
-## PREREQ: Source setup files
-```bash
-source install/setup.bash
-```
-
 ## PREREQ: Build PX4_ros_com package (might have to source ROS first)
 ```bash
 colcon build --packages-select <pckg-name>
+```
+
+## PREREQ: Source setup files
+```bash
+source install/setup.bash
 ```
 
 ## Run flight example
