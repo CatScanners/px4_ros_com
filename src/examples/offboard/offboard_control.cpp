@@ -42,9 +42,11 @@
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
 #include <px4_msgs/msg/vehicle_control_mode.hpp>
+#include <px4_msgs/msg/sensor_gps.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <stdint.h>
 
+#include <std_msgs/msg/string.hpp> // to listen for incoming setpoints
 #include <chrono>
 #include <iostream>
 
@@ -62,10 +64,15 @@ public:
 		trajectory_setpoint_publisher_ = this->create_publisher<TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
 		vehicle_command_publisher_ = this->create_publisher<VehicleCommand>("/fmu/in/vehicle_command", 10);
 
+		// Listen to setpoints from other nodes
+		trajectory_setpoint_listener_ = this->create_subscription<std_msgs::msg::String>("command", 10, std::bind(&OffboardControl::command_callback, this, std::placeholders::_1));
+
 		offboard_setpoint_counter_ = 0;
 
 		auto timer_callback = [this]() -> void {
 
+			// Switch to offboard mode and armAFTER 10 trajectory setpoints have been sent.
+			// https://docs.px4.io/main/en/ros2/offboard_control.html#:~:text=PX4%20requires%20that%20the%20vehicle%20is%20already%20receiving%20OffboardControlMode%20messages%20before
 			if (offboard_setpoint_counter_ == 10) {
 				// Change to Offboard mode after 10 setpoints
 				this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
@@ -78,10 +85,21 @@ public:
 			publish_offboard_control_mode();
 			publish_trajectory_setpoint();
 
-			// stop the counter after reaching 11
+			// stop the counter after reaching 11, no need to count anymore.
 			if (offboard_setpoint_counter_ < 11) {
 				offboard_setpoint_counter_++;
 			}
+
+			rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
+			auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
+			
+			// Print the altitude
+			subscription_ = this->create_subscription<px4_msgs::msg::SensorGps>("/fmu/out/vehicle_gps_position", qos,
+			[this](const px4_msgs::msg::SensorGps::UniquePtr msg) {
+				std::cout << "\n";
+				std::cout << "alt: " << msg->altitude_msl_m  << std::endl;
+			});
+
 		};
 		timer_ = this->create_wall_timer(100ms, timer_callback);
 	}
@@ -92,6 +110,7 @@ public:
 private:
 	rclcpp::TimerBase::SharedPtr timer_;
 
+	rclcpp::Subscription<px4_msgs::msg::SensorGps>::SharedPtr subscription_;
 	rclcpp::Publisher<OffboardControlMode>::SharedPtr offboard_control_mode_publisher_;
 	rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_setpoint_publisher_;
 	rclcpp::Publisher<VehicleCommand>::SharedPtr vehicle_command_publisher_;
@@ -103,6 +122,18 @@ private:
 	void publish_offboard_control_mode();
 	void publish_trajectory_setpoint();
 	void publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0);
+
+	// callback method for published commands
+	void command_callback(const std_msgs::msg::String::SharedPtr msg)
+    {
+      RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg->data.c_str());
+	  //float new_height = std::stof(msg->data.c_str());
+	  //this->publish_offboard_control_mode();
+	  // this->publish_trajectory_setpoint(new_height);
+    }
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr trajectory_setpoint_listener_;
+
+
 };
 
 /**
