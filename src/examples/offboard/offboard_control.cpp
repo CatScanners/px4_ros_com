@@ -128,10 +128,11 @@ private:
 	void vehicle_gps_callback(const px4_msgs::msg::SensorGps::UniquePtr msg)
 	{
 		// Attributes of SensorGPS here please check https://github.com/PX4/px4_msgs/blob/main/msg/SensorGps.msg
-		std::cout << "alt: " << msg->altitude_msl_m  << std::endl;
-		std::cout << "lat: " << msg->latitude_deg  << std::endl;
-		std::cout << "lon: " << msg->longitude_deg << std::endl;
-		std::cout << "vel_m_s: " << msg->vel_m_s << std::endl;
+		std::cout << "alt: " << msg->altitude_msl_m 
+          << " lat: " << msg->latitude_deg 
+          << " lon: " << msg->longitude_deg 
+          << " vel_m_s: " << msg->vel_m_s 
+          << std::endl;
 	}
 
 	void trajectory_setpoint_callback(const TrajectorySetpoint::SharedPtr msg)
