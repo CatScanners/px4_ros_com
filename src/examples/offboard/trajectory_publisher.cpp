@@ -3,6 +3,7 @@
 #include <px4_msgs/msg/vehicle_command.hpp>
 #include <chrono>
 #include <iostream>
+#include <cmath>
 
 using namespace std::chrono;
 using namespace std::chrono_literals;
@@ -29,6 +30,7 @@ private:
     int counter_;
     int mission_count_;
     MissionState state_;
+    const int EACH_MOVE_COUNT = 30;
 
     void publish_trajectory()
     {
@@ -41,15 +43,15 @@ private:
                     RCLCPP_INFO(this->get_logger(), "'Fly left right'-mission.");
                 }
                 
-                if (counter_ < 20) {
+                if (counter_ < EACH_MOVE_COUNT) {
                     msg.position = {0.0, -4.0, -5.0}; // Go left 4m.
-                } else if (counter_ < 40) {
+                } else if (counter_ < 2 * EACH_MOVE_COUNT) {
                     msg.position = {0.0, 0.0, -5.0}; // Go right (go back).
                 }
 
                 msg.yaw = -3.14;
 
-                if (counter_ >= 40) {
+                if (counter_ >= 2 * EACH_MOVE_COUNT) {
                     state_ = FLY_FORWARD_BACKWARD;
                     counter_ = 0;
                 }
@@ -61,15 +63,15 @@ private:
                     RCLCPP_INFO(this->get_logger(), "'Fly forward backward'-mission.");
                 }
 
-                if (counter_ < 20) {
+                if (counter_ < EACH_MOVE_COUNT) {
                     msg.position = {4.0, 0.0, -5.0}; // Fly forward (north)
-                } else if (counter_ < 40) {
+                } else if (counter_ < 2 * EACH_MOVE_COUNT) {
                     msg.position = {0.0, 0.0, -5.0}; // Go back.
                 }
 
                 msg.yaw = -3.14;
                 
-                if (counter_ >= 40) {
+                if (counter_ >= 2 * EACH_MOVE_COUNT) {
                     state_ = FLY_UP_DOWN;
                     counter_ = 0;
                 }
@@ -81,26 +83,47 @@ private:
                     RCLCPP_INFO(this->get_logger(), "'Fly up down'-mission.");
                 }
                 
-                if (counter_ < 20) {
+                if (counter_ < EACH_MOVE_COUNT) {
                     msg.position = {0.0, 0.0, -3.0}; // Go down.
-                } else if (counter_ < 40) {
+                } else if (counter_ < 2 * EACH_MOVE_COUNT) {
                     msg.position = {0.0, 0.0, -5.0}; // Go up.
                 }
                 
                 msg.yaw = -3.14;
 
-                if (counter_ >= 40) {
-                    mission_count_++;
-
-                    if (mission_count_ < 3) {
-                        state_ = FLY_LEFT_RIGHT;
-                    } else {
-                        state_ = DONE; // Stop sending commands (End of all missions).
-                    }
-
+                if (counter_ >= 2 * EACH_MOVE_COUNT) {
+                    state_ = ROTATE;
                     counter_ = 0;
                 }
 
+                break;
+
+            case ROTATE:
+                if (counter_ == 1) {
+                    RCLCPP_INFO(this->get_logger(), "'Rotate'-mission.");
+                }
+    
+                msg.position = {0.0, 0.0, -5.0}; // Keep position constant
+    
+                if (counter_ < EACH_MOVE_COUNT) {
+                    // Gradually increase yaw from -π to π (full rotation)
+                    msg.yaw = -M_PI + (2 * M_PI * counter_ / EACH_MOVE_COUNT);  // Full 360-degree rotation counterclockwise.
+                } else if (counter_ < 2 * EACH_MOVE_COUNT) {
+                    msg.yaw = M_PI - (2 * M_PI * counter_ / EACH_MOVE_COUNT);
+                }
+                
+                if (counter_ >= 2 * EACH_MOVE_COUNT) {
+                    mission_count_++;
+    
+                    if (mission_count_ < 3) {
+                        state_ = FLY_LEFT_RIGHT;
+                    } else {
+                        state_ = DONE; // Stop sending commands
+                    }
+    
+                    counter_ = 0;
+                }
+    
                 break;
             
             case DONE:
