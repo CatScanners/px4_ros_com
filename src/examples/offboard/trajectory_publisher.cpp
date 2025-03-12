@@ -11,7 +11,7 @@ using namespace px4_msgs::msg;
 class TrajectoryPublisher : public rclcpp::Node
 {
 public:
-    TrajectoryPublisher() : Node("trajectory_publisher"), counter_(0), state_(FLY_LEFT_RIGHT)
+    TrajectoryPublisher() : Node("trajectory_publisher"), counter_(1), mission_count_(0), state_(FLY_LEFT_RIGHT)
     {
         trajectory_publisher_ = this->create_publisher<TrajectorySetpoint>("/custom_trajectory", 10);
         vehicle_command_publisher_ = this->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
@@ -27,6 +27,7 @@ private:
     rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_publisher_;
     rclcpp::TimerBase::SharedPtr timer_;
     int counter_;
+    int mission_count_;
     MissionState state_;
 
     void publish_trajectory()
@@ -36,7 +37,7 @@ private:
         switch (state_)
         {
             case FLY_LEFT_RIGHT:
-                if (counter_ == 0) {
+                if (counter_ == 1) {
                     RCLCPP_INFO(this->get_logger(), "'Fly left right'-mission.");
                 }
                 
@@ -56,7 +57,7 @@ private:
                 break;
             
             case FLY_FORWARD_BACKWARD:
-                if (counter_ == 0) {
+                if (counter_ == 1) {
                     RCLCPP_INFO(this->get_logger(), "'Fly forward backward'-mission.");
                 }
 
@@ -76,7 +77,7 @@ private:
                 break;
             
             case FLY_UP_DOWN:
-                if (counter_ == 0) {
+                if (counter_ == 1) {
                     RCLCPP_INFO(this->get_logger(), "'Fly up down'-mission.");
                 }
                 
@@ -89,18 +90,26 @@ private:
                 msg.yaw = -3.14;
 
                 if (counter_ >= 40) {
-                    state_ = DONE; // Start a new mission.
+                    mission_count_++;
+
+                    if (mission_count_ < 3) {
+                        state_ = FLY_LEFT_RIGHT;
+                    } else {
+                        state_ = DONE; // Stop sending commands (End of all missions).
+                    }
+
                     counter_ = 0;
                 }
 
                 break;
             
             case DONE:
-                if (counter_ == 0) {
+                if (counter_ == 1) {
                     RCLCPP_INFO(this->get_logger(), "Mission done. Set LAND-mode.");
-                    set_land_mode();
                 }
-                
+
+                set_land_mode();
+
                 return;
         }
         
