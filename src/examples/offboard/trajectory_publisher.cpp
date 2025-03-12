@@ -11,18 +11,18 @@ using namespace px4_msgs::msg;
 class TrajectoryPublisher : public rclcpp::Node
 {
 public:
-    TrajectoryPublisher() : Node("trajectory_publisher"), counter_(0), state_(TAKEOFF)
+    TrajectoryPublisher() : Node("trajectory_publisher"), counter_(0), state_(FLY_LEFT_RIGHT)
     {
         trajectory_publisher_ = this->create_publisher<TrajectorySetpoint>("/custom_trajectory", 10);
         vehicle_command_publisher_ = this->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
-        // rclcpp::Logger logger = this->get_logger();
+        rclcpp::Logger logger = this->get_logger();
         RCLCPP_INFO(logger, "Trajectory Publisher Node Started.");
         // Publishes trajectory every 100ms.
         timer_ = this->create_wall_timer(100ms, std::bind(&TrajectoryPublisher::publish_trajectory, this));
     }
 
 private:
-    enum MissionState { TAKEOFF, FLY_UP_DOWN, FLY_LEFT_RIGHT, FLY_SQUARE, LAND, DONE };
+    enum MissionState { FLY_LEFT_RIGHT, FLY_FORWARD_BACKWARD, FLY_UP_DOWN, ROTATE, DONE };
     rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_publisher_;
     rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_publisher_;
     rclcpp::TimerBase::SharedPtr timer_;
@@ -35,39 +35,6 @@ private:
 
         switch (state_)
         {
-            case TAKEOFF:
-                if (counter_ == 0) {
-                    RCLCPP_INFO(this->get_logger(), "Takeoff.");
-                }
-                
-                msg.position = {0.0, 0.0, -5.0}; // Go up (takeoff) to 5m height.
-                msg.yaw = -3.14;
-                if (counter_ >= 100) { // Wait for 10 seconds (assuming counter_ is updated every 100ms).
-                    state_ = FLY_UP_DOWN; // Start a new mission.
-                    counter_ = 0;
-                }
-                break;
-            
-            case FLY_UP_DOWN:
-                if (counter_ == 0) {
-                    RCLCPP_INFO(this->get_logger(), "'Fly up down'-mission.");
-                }
-                
-                if (counter_ < 100) {
-                    msg.position = {0.0, 0.0, 0.0};
-                } else if (counter_ < 200) {
-                    msg.position = {0.0, 0.0, -5.0};
-                }
-                
-                msg.yaw = -3.14;
-
-                if (counter_ >= 200) { // Wait for 10 seconds (assuming counter_ is updated every 100ms).
-                    state_ = FLY_LEFT_RIGHT; // Start a new mission.
-                    counter_ = 0;
-                }
-
-                break;
-            
             case FLY_LEFT_RIGHT:
                 if (counter_ == 0) {
                     RCLCPP_INFO(this->get_logger(), "'Fly left right'-mission.");
@@ -77,39 +44,61 @@ private:
                     msg.position = {0.0, -4.0, -5.0}; // Go left 4m.
                 } else if (counter_ < 200) {
                     msg.position = {0.0, 0.0, -5.0}; // Go right (go back).
-                } else if (counter_ < 300) {
-                    msg.position = {0.0, -4.0, -5.0};  // Go left 4m.
-                } else if (counter_ < 400) {
-                    msg.position = {0.0, 0.0, -5.0}; // Go right (go back).
                 }
 
                 msg.yaw = -3.14;
 
-                if (counter_ >= 400) {
-                    state_ = DONE; // state_ = LAND;
+                if (counter_ >= 200) {
+                    state_ = FLY_FORWARD_BACKWARD;
                     counter_ = 0;
                 }
 
                 break;
             
-            case LAND:
+            case FLY_FORWARD_BACKWARD:
+                if (counter_ == 0) {
+                    RCLCPP_INFO(this->get_logger(), "'Fly forward backward'-mission.");
+                }
+
                 if (counter_ < 100) {
-                    msg.position = {0.0, 0.0, 0.0};
+                    msg.position = {4.0, 0.0, -5.0}; // Fly forward (north)
+                } else if (counter_ < 200) {
+                    msg.position = {0.0, 0.0, -5.0}; // Go back.
                 }
 
                 msg.yaw = -3.14;
                 
-                if (counter_ >= 100) {
-                    state_ = DONE;
+                if (counter_ >= 200) {
+                    state_ = FLY_UP_DOWN;
                     counter_ = 0;
                 }
 
                 break;
+            
+            case FLY_UP_DOWN:
+                if (counter_ == 0) {
+                    RCLCPP_INFO(this->get_logger(), "'Fly up down'-mission.");
+                }
+                
+                if (counter_ < 100) {
+                    msg.position = {0.0, 0.0, -2.0}; // Go down.
+                } else if (counter_ < 200) {
+                    msg.position = {0.0, 0.0, -5.0}; // Go up.
+                }
+                
+                msg.yaw = -3.14;
 
+                if (counter_ >= 200) {
+                    state_ = DONE; // Start a new mission.
+                    counter_ = 0;
+                }
+
+                break;
+            
             case DONE:
                 if (counter_ == 0) {
-                    RCLCPP_INFO(this->get_logger(), "Mission done. Disarming drone...");
-                    send_land_command();
+                    RCLCPP_INFO(this->get_logger(), "Mission done. Set LAND-mode.");
+                    set_land_mode();
                 }
                 
                 return;
@@ -121,30 +110,29 @@ private:
         trajectory_publisher_->publish(msg);
     }
 
-    void send_land_command();
+    void set_land_mode();
 };
 
-void TrajectoryPublisher::send_land_command()
+// TODO: This function should be before deploying it.
+void TrajectoryPublisher::set_land_mode()
 {
     px4_msgs::msg::VehicleCommand msg{};
-    msg.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_NAV_LAND; // Land command
+    msg.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_MODE; // Command to change mode
+    msg.param1 = 1;  // Custom mode
+    msg.param2 = 6;  // 6 corresponds to LAND mode in PX4
     msg.target_system = 1;
     msg.target_component = 1;
     msg.source_system = 1;
     msg.source_component = 1;
     msg.from_external = true;
     msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
-    
+
     vehicle_command_publisher_->publish(msg);
-    RCLCPP_INFO(this->get_logger(), "Landing command sent.");
+    RCLCPP_INFO(this->get_logger(), "LAND mode set.");
 }
 
 int main(int argc, char *argv[])
 {
-    rclcpp::Logger logger = rclcpp::get_logger("trajectory_publisher");
-    if (rcutils_logging_set_logger_level(logger.get_name(), RCUTILS_LOG_SEVERITY_DEBUG) != RCUTILS_RET_OK) {
-        RCLCPP_WARN(logger, "Failed to set log level.");
-    }
     rclcpp::init(argc, argv);
     rclcpp::spin(std::make_shared<TrajectoryPublisher>());
     rclcpp::shutdown();
