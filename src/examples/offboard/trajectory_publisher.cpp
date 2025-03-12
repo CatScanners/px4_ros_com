@@ -40,15 +40,15 @@ private:
                     RCLCPP_INFO(this->get_logger(), "'Fly left right'-mission.");
                 }
                 
-                if (counter_ < 100) {
+                if (counter_ < 20) {
                     msg.position = {0.0, -4.0, -5.0}; // Go left 4m.
-                } else if (counter_ < 200) {
+                } else if (counter_ < 40) {
                     msg.position = {0.0, 0.0, -5.0}; // Go right (go back).
                 }
 
                 msg.yaw = -3.14;
 
-                if (counter_ >= 200) {
+                if (counter_ >= 40) {
                     state_ = FLY_FORWARD_BACKWARD;
                     counter_ = 0;
                 }
@@ -60,15 +60,15 @@ private:
                     RCLCPP_INFO(this->get_logger(), "'Fly forward backward'-mission.");
                 }
 
-                if (counter_ < 100) {
+                if (counter_ < 20) {
                     msg.position = {4.0, 0.0, -5.0}; // Fly forward (north)
-                } else if (counter_ < 200) {
+                } else if (counter_ < 40) {
                     msg.position = {0.0, 0.0, -5.0}; // Go back.
                 }
 
                 msg.yaw = -3.14;
                 
-                if (counter_ >= 200) {
+                if (counter_ >= 40) {
                     state_ = FLY_UP_DOWN;
                     counter_ = 0;
                 }
@@ -80,15 +80,15 @@ private:
                     RCLCPP_INFO(this->get_logger(), "'Fly up down'-mission.");
                 }
                 
-                if (counter_ < 100) {
-                    msg.position = {0.0, 0.0, -2.0}; // Go down.
-                } else if (counter_ < 200) {
+                if (counter_ < 20) {
+                    msg.position = {0.0, 0.0, -3.0}; // Go down.
+                } else if (counter_ < 40) {
                     msg.position = {0.0, 0.0, -5.0}; // Go up.
                 }
                 
                 msg.yaw = -3.14;
 
-                if (counter_ >= 200) {
+                if (counter_ >= 40) {
                     state_ = DONE; // Start a new mission.
                     counter_ = 0;
                 }
