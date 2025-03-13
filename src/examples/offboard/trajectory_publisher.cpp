@@ -35,6 +35,8 @@ private:
     void publish_trajectory()
     {
         TrajectorySetpoint msg{};
+        RCLCPP_INFO(this->get_logger(), "Velocity: [%f, %f, %f]", msg.velocity[0], msg.velocity[1], msg.velocity[2]);
+        RCLCPP_INFO(this->get_logger(), "Acceleration: [%f, %f, %f]", msg.acceleration[0], msg.acceleration[1], msg.acceleration[2]);
 
         switch (state_)
         {
@@ -42,11 +44,13 @@ private:
                 if (counter_ == 1) {
                     RCLCPP_INFO(this->get_logger(), "'Fly left right'-mission.");
                 }
-                
+
                 if (counter_ < EACH_MOVE_COUNT) {
-                    msg.position = {0.0, -4.0, -5.0}; // Go left 4m.
+                    float progress = static_cast<float>(counter_) / EACH_MOVE_COUNT; // Scale from 0 to 1
+                    msg.position = {0.0f, -4.0f * progress, -5.0f}; // Interpolate along Y-axis
                 } else if (counter_ < 2 * EACH_MOVE_COUNT) {
-                    msg.position = {0.0, 0.0, -5.0}; // Go right (go back).
+                    float progress = static_cast<float>(counter_ - EACH_MOVE_COUNT) / EACH_MOVE_COUNT;
+                    msg.position = {0.0f, -4.0f + (4.0f * progress), -5.0f};
                 }
 
                 msg.yaw = -3.14;
@@ -64,9 +68,11 @@ private:
                 }
 
                 if (counter_ < EACH_MOVE_COUNT) {
-                    msg.position = {4.0, 0.0, -5.0}; // Fly forward (north)
+                    float progress = static_cast<float>(counter_) / EACH_MOVE_COUNT;
+                    msg.position = {4.0f * progress, 0.0f, -5.0f}; // Fly forward (north)
                 } else if (counter_ < 2 * EACH_MOVE_COUNT) {
-                    msg.position = {0.0, 0.0, -5.0}; // Go back.
+                    float progress = static_cast<float>(counter_ - EACH_MOVE_COUNT) / EACH_MOVE_COUNT;
+                    msg.position = {4.0f - (4.0f * progress), 0.0f, -5.0f}; // Go back.
                 }
 
                 msg.yaw = -3.14;
@@ -84,11 +90,13 @@ private:
                 }
                 
                 if (counter_ < EACH_MOVE_COUNT) {
-                    msg.position = {0.0, 0.0, -3.0}; // Go down.
+                    float progress = static_cast<float>(counter_) / EACH_MOVE_COUNT;
+                    msg.position = {0.0f, 0.0f, -5.0f + (2.0f * progress)}; // Go down.
                 } else if (counter_ < 2 * EACH_MOVE_COUNT) {
-                    msg.position = {0.0, 0.0, -5.0}; // Go up.
+                    float progress = static_cast<float>(counter_ - EACH_MOVE_COUNT) / EACH_MOVE_COUNT;
+                    msg.position = {0.0f, 0.0f, -3.0f - (2.0f * progress)};
                 }
-                
+
                 msg.yaw = -3.14;
 
                 if (counter_ >= 2 * EACH_MOVE_COUNT) {
