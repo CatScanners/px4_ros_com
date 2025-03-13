@@ -39,22 +39,13 @@ private:
     int mission_count_;
     MissionState state_;
     const int EACH_MOVE_COUNT = 30;
-
     VehicleLocalPosition current_position_;
 
     void vehicle_local_position_callback(const VehicleLocalPosition::SharedPtr msg)
     {
         current_position_ = *msg;
-        /*std::cout << "z: " << msg->z
-                      << " x: " << msg->x 
-                      << " y: " << msg->y
-                      << " yaw: " << msg->heading
-					  << " dx: " << msg->vx
-					  << " dy: " << msg->vy
-					  << " dz: " << msg->vz
-                      << std::endl; */
-    }
 
+    }
 
     void publish_trajectory()
     {
@@ -71,10 +62,10 @@ private:
 
                 if (counter_ < EACH_MOVE_COUNT) {
                     float progress = static_cast<float>(counter_) / EACH_MOVE_COUNT; // Scale from 0 to 1
-                    msg.position = {0.0f, -4.0f * progress, -5.0f}; // Interpolate along Y-axis
+                    msg.position = {this->current_position_.x, current_position_.y + 0.1f, current_position_.z}; // Interpolate along Y-axis
                 } else if (counter_ < 2 * EACH_MOVE_COUNT) {
                     float progress = static_cast<float>(counter_ - EACH_MOVE_COUNT) / EACH_MOVE_COUNT;
-                    msg.position = {0.0f, -4.0f + (4.0f * progress), -5.0f};
+                    msg.position = {current_position_.x, current_position_.y - 0.1f, current_position_.z};
                 }
 
                 msg.yaw = -3.14;
