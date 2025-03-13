@@ -1,6 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
+#include <px4_msgs/msg/vehicle_local_position.hpp>
 #include <chrono>
 #include <iostream>
 #include <cmath>
@@ -14,8 +15,14 @@ class TrajectoryPublisher : public rclcpp::Node
 public:
     TrajectoryPublisher() : Node("trajectory_publisher"), counter_(1), mission_count_(0), state_(FLY_LEFT_RIGHT)
     {
+
+        rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
+		auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
+
         trajectory_publisher_ = this->create_publisher<TrajectorySetpoint>("/custom_trajectory", 10);
         vehicle_command_publisher_ = this->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
+        subscription_ = this->create_subscription<VehicleLocalPosition>("/fmu/out/vehicle_local_position", qos,std::bind(&TrajectoryPublisher::vehicle_local_position_callback, this, std::placeholders::_1));
+
         rclcpp::Logger logger = this->get_logger();
         RCLCPP_INFO(logger, "Trajectory Publisher Node Started.");
         // Publishes trajectory every 100ms.
@@ -25,12 +32,29 @@ public:
 private:
     enum MissionState { FLY_LEFT_RIGHT, FLY_FORWARD_BACKWARD, FLY_UP_DOWN, ROTATE, DONE };
     rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_publisher_;
-    rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_publisher_;
+    rclcpp::Publisher<VehicleCommand>::SharedPtr vehicle_command_publisher_;
+    rclcpp::Subscription<VehicleLocalPosition>::SharedPtr subscription_;
     rclcpp::TimerBase::SharedPtr timer_;
     int counter_;
     int mission_count_;
     MissionState state_;
     const int EACH_MOVE_COUNT = 30;
+
+    VehicleLocalPosition current_position_;
+
+    void vehicle_local_position_callback(const VehicleLocalPosition::SharedPtr msg)
+    {
+        current_position_ = *msg;
+        /*std::cout << "z: " << msg->z
+                      << " x: " << msg->x 
+                      << " y: " << msg->y
+                      << " yaw: " << msg->heading
+					  << " dx: " << msg->vx
+					  << " dy: " << msg->vy
+					  << " dz: " << msg->vz
+                      << std::endl; */
+    }
+
 
     void publish_trajectory()
     {
