@@ -44,8 +44,7 @@
  #include <px4_msgs/msg/offboard_control_mode.hpp>
  #include <px4_msgs/msg/trajectory_setpoint.hpp>
  #include <px4_msgs/msg/vehicle_command.hpp>
- #include <px4_msgs/msg/vehicle_control_mode.hpp>
- #include <px4_msgs/msg/sensor_gps.hpp>
+ #include <px4_msgs/msg/vehicle_local_position.hpp>
  #include <rclcpp/rclcpp.hpp>
  #include <stdint.h>
  
@@ -70,13 +69,9 @@
 		 trajectory_setpoint_publisher_ = this->create_publisher<TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
 		 vehicle_command_publisher_ = this->create_publisher<VehicleCommand>("/fmu/in/vehicle_command", 10);
  
-		 // Subsribe to our setpoints
 		 custom_trajectory_subscription_ = this->create_subscription<TrajectorySetpoint>("/custom_trajectory", 10, std::bind(&OffboardControl::trajectory_setpoint_callback, this, std::placeholders::_1));
-		 // Subscribe to the GPS from PX4
-		 subscription_ = this->create_subscription<px4_msgs::msg::SensorGps>("/fmu/out/vehicle_gps_position", qos,std::bind(&OffboardControl::vehicle_gps_callback, this, std::placeholders::_1));
+		 subscription_ = this->create_subscription<VehicleLocalPosition>("/fmu/out/vehicle_local_position", qos,std::bind(&OffboardControl::vehicle_gps_callback, this, std::placeholders::_1));
  
-		 // Listen to setpoints from other nodes
-		 
 		 offboard_setpoint_counter_ = 0;
  
 		 auto timer_callback = [this]() -> void {
@@ -107,9 +102,10 @@
 	 // void disarm();
  
  private:
+ 	 int print_counter_ = 0;
 	 rclcpp::TimerBase::SharedPtr timer_;
  
-	 rclcpp::Subscription<px4_msgs::msg::SensorGps>::SharedPtr subscription_;
+	 rclcpp::Subscription<VehicleLocalPosition>::SharedPtr subscription_;
 	 rclcpp::Publisher<OffboardControlMode>::SharedPtr offboard_control_mode_publisher_;
 	 rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_setpoint_publisher_;
 	 rclcpp::Publisher<VehicleCommand>::SharedPtr vehicle_command_publisher_;
@@ -124,14 +120,20 @@
 	 void publish_trajectory_setpoint();
 	 void publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0);
  
-	 void vehicle_gps_callback(const px4_msgs::msg::SensorGps::UniquePtr msg)
+	 void vehicle_gps_callback(const VehicleLocalPosition::SharedPtr msg)
 	 {
-		 // Attributes of SensorGPS here please check https://github.com/PX4/px4_msgs/blob/main/msg/SensorGps.msg
-		 /*std::cout << "alt: " << msg->altitude_msl_m 
-		   << " lat: " << msg->latitude_deg 
-		   << " lon: " << msg->longitude_deg 
-		   << " vel_m_s: " << msg->vel_m_s 
-		   << std::endl;*/
+		print_counter_++;
+        
+        // Only print every 10th callback
+        if (print_counter_ % 30 == 0)
+        {
+            std::cout << "z: " << msg->z
+                      << " x: " << msg->x 
+                      << " y: " << msg->y
+                      << " yaw: " << msg->heading
+                      << std::endl;
+        }
+
 	 }
  
 	 void trajectory_setpoint_callback(const TrajectorySetpoint::SharedPtr msg)
@@ -171,7 +173,7 @@
  {
 	 OffboardControlMode msg{};
 	 msg.position = true;
-	 msg.velocity = false;
+	 msg.velocity = true;
 	 msg.acceleration = false;
 	 msg.attitude = false;
 	 msg.body_rate = false;
