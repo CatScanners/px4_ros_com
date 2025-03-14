@@ -5,13 +5,13 @@ MicroXRCEAgent udp4 -p 8888
 
 ## PREREQ: Run Gazebo simulation
 ```bash
-cd PX4-Autopilot
+cd xxx/PX4-Autopilot
 HEADLESS=1 make px4_sitl gz_x500 # headless if you don't have gui
 ```
 
 ## PREREQ: Build PX4_ros_com package (might have to source ROS first)
 ```bash
-colcon build --packages-select <pckg-name>
+colcon build
 ```
 
 ## PREREQ: Source setup files
@@ -31,12 +31,27 @@ mavproxy.py --master=udp:127.0.0.1:14540
 param set COM_FLTMODE2 7 # 7 = Offboard, as mentioned here https://docs.px4.io/main/en/advanced_config/parameter_reference.html#commander
 ```
 
-Run example code that should raise the drone to 500m.
+Offboard control node (by default goes to 6m).
 ```bash
 ros2 run px4_ros_com offboard_control
 ```
 
-Run ros2 commands on demand:
+Run offboard commands on demand:
 ```bash
 ros2 topic pub /custom_trajectory px4_msgs/msg/TrajectorySetpoint "{ position: [ 0.0, 0.0, -50.0 ], velocity: [0.0, 0.0, 0.0],  yaw: -3.14 }"
+```
+
+## Run predefined motion (up, left, forward, rotate) x2:
+1.
+```
+ros2 run px4_ros_com offboard_control # start offboard node
+```
+2. Arm from QGroundCtonrol / via mavproxy by running ```arm throttle```.
+3. Record
+```
+ros2 bag record /fmu/out/vehicle_local_position
+```
+4. Start motions
+```
+ros2 run px4_ros_com maneuver.py # start the script
 ```
