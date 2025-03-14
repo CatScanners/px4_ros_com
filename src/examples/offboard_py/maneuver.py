@@ -75,15 +75,15 @@ class Maneuver(Node):
         x, y, z = self.current_coords[0], self.current_coords[1], self.current_coords[2] # hardcode z
         yaw = self.current_yaw
         motions = [
-            (x + 3.0, y, z, yaw),
+            (x + 6.0, y, z, yaw),
             (x, y, z, yaw),
+            (x, y, -7.0, yaw),
             (x, y, -5.0, yaw),
-            (x, y, -3.0, yaw),
-            (x, y + 3.0, -3.0, yaw),
-            (x, y, -3.0, yaw)
+            (x, y + 6.0, -5.0, yaw),
+            (x, y, -5.0, yaw)
         ]
-        s1 = 1.0
-        s2 = 0.6
+        s1 = 1.6
+        s2 = 0.4
         self.perform_motions(motions, s1)
         self.perform_motions(motions, s2)
         self.get_logger().info("Drone movement complete!")
