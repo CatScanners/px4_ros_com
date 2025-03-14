@@ -77,20 +77,15 @@ class Maneuver(Node):
         motions = [
             (x + 3.0, y, z, yaw),
             (x, y, z, yaw),
+            (x, y, -5.0, yaw),
             (x, y, -3.0, yaw),
-            (x, y, -3.0, yaw),
-            (x, y + 3.0, -6.0, yaw),
-            (x, y, -6.0, yaw)
+            (x, y + 3.0, -3.0, yaw),
+            (x, y, -3.0, yaw)
         ]
         s1 = 1.0
         s2 = 0.6
-        start_time = time.time()
         self.perform_motions(motions, s1)
         self.perform_motions(motions, s2)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f"Time elapsed: {elapsed_time:.6f} seconds")
-
         self.get_logger().info("Drone movement complete!")
 
 
