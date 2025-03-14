@@ -98,7 +98,7 @@
 		 timer_ = this->create_wall_timer(100ms, timer_callback);
 	 }
  
-	 // void arm();
+	 void arm();
 	 // void disarm();
  
  private:
@@ -131,6 +131,9 @@
                       << " x: " << msg->x 
                       << " y: " << msg->y
                       << " yaw: " << msg->heading
+					  << " dx: " << msg->vx
+					  << " dy: " << msg->vy
+					  << " dz: " << msg->vz
                       << std::endl;
         }
 
@@ -139,8 +142,6 @@
 	 void trajectory_setpoint_callback(const TrajectorySetpoint::SharedPtr msg)
 	 {
 		 current_trajectory_setpoint_ = *msg;
-		 /*RCLCPP_INFO(this->get_logger(), "Received trajectory: [%.2f, %.2f, %.2f]",
-					 msg->position[0], msg->position[1], msg->position[2]);*/
 	 }
  
  };
@@ -148,12 +149,12 @@
  /**
   * @brief Send a command to Arm the vehicle
   */
- /*void OffboardControl::arm()
+ void OffboardControl::arm()
  {
 	 publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
  
 	 RCLCPP_INFO(this->get_logger(), "Arm command send");
- }*/
+ }
  
  /**
   * @brief Send a command to Disarm the vehicle
@@ -173,7 +174,7 @@
  {
 	 OffboardControlMode msg{};
 	 msg.position = true;
-	 msg.velocity = true;
+	 msg.velocity = false;
 	 msg.acceleration = false;
 	 msg.attitude = false;
 	 msg.body_rate = false;
@@ -185,7 +186,7 @@
   * @brief Publish a trajectory setpoint
   */
  void OffboardControl::publish_trajectory_setpoint()
- {
+ {	
 	 // LOOK AT WAYPOINTS: https://github.com/PX4/px4_msgs/blob/main/msg/TrajectoryWaypoint.msg
 	 if (current_trajectory_setpoint_.position.size() == 3) { // x, y and z coordinate received.
 		 /* RCLCPP_INFO(this->get_logger(), "Published trajectory: [%.2f, %.2f, %.2f]",
