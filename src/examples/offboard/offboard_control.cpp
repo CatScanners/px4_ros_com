@@ -71,7 +71,7 @@
  
 		 custom_trajectory_subscription_ = this->create_subscription<TrajectorySetpoint>("/custom_trajectory", 10, std::bind(&OffboardControl::trajectory_setpoint_callback, this, std::placeholders::_1));
 		 subscription_ = this->create_subscription<VehicleLocalPosition>("/fmu/out/vehicle_local_position", qos,std::bind(&OffboardControl::vehicle_gps_callback, this, std::placeholders::_1));
-		 current_trajectory_setpoint_.position = {0.0f, 0.0f, -6.0f};
+		 current_trajectory_setpoint_.position = {0.0f, 0.0f, -3.0f};
 		 offboard_setpoint_counter_ = 0;
  
 		 auto timer_callback = [this]() -> void {
