@@ -71,7 +71,7 @@
  
 		 custom_trajectory_subscription_ = this->create_subscription<TrajectorySetpoint>("/custom_trajectory", 10, std::bind(&OffboardControl::trajectory_setpoint_callback, this, std::placeholders::_1));
 		 subscription_ = this->create_subscription<VehicleLocalPosition>("/fmu/out/vehicle_local_position", qos,std::bind(&OffboardControl::vehicle_gps_callback, this, std::placeholders::_1));
- 
+		 current_trajectory_setpoint_.position = {0.0f, 0.0f, -6.0f};
 		 offboard_setpoint_counter_ = 0;
  
 		 auto timer_callback = [this]() -> void {
@@ -98,7 +98,7 @@
 		 timer_ = this->create_wall_timer(100ms, timer_callback);
 	 }
  
-	 // void arm();
+	 void arm();
 	 // void disarm();
  
  private:
@@ -115,6 +115,8 @@
 	 uint64_t offboard_setpoint_counter_;   //!< counter for the number of setpoints sent
 	 TrajectorySetpoint current_trajectory_setpoint_; //!< next setpoint, where the drone should be.
 	 float current_trajectory_altitude_ = 0; // current trajectory setpoint that we are sending
+
+
  
 	 void publish_offboard_control_mode();
 	 void publish_trajectory_setpoint();
@@ -131,6 +133,9 @@
                       << " x: " << msg->x 
                       << " y: " << msg->y
                       << " yaw: " << msg->heading
+					  << " dx: " << msg->vx
+					  << " dy: " << msg->vy
+					  << " dz: " << msg->vz
                       << std::endl;
         }
 
@@ -139,8 +144,6 @@
 	 void trajectory_setpoint_callback(const TrajectorySetpoint::SharedPtr msg)
 	 {
 		 current_trajectory_setpoint_ = *msg;
-		 /*RCLCPP_INFO(this->get_logger(), "Received trajectory: [%.2f, %.2f, %.2f]",
-					 msg->position[0], msg->position[1], msg->position[2]);*/
 	 }
  
  };
@@ -148,12 +151,12 @@
  /**
   * @brief Send a command to Arm the vehicle
   */
- /*void OffboardControl::arm()
+ void OffboardControl::arm()
  {
 	 publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
  
 	 RCLCPP_INFO(this->get_logger(), "Arm command send");
- }*/
+ }
  
  /**
   * @brief Send a command to Disarm the vehicle
@@ -173,7 +176,7 @@
  {
 	 OffboardControlMode msg{};
 	 msg.position = true;
-	 msg.velocity = true;
+	 msg.velocity = false;
 	 msg.acceleration = false;
 	 msg.attitude = false;
 	 msg.body_rate = false;
@@ -185,7 +188,7 @@
   * @brief Publish a trajectory setpoint
   */
  void OffboardControl::publish_trajectory_setpoint()
- {
+ {	
 	 // LOOK AT WAYPOINTS: https://github.com/PX4/px4_msgs/blob/main/msg/TrajectoryWaypoint.msg
 	 if (current_trajectory_setpoint_.position.size() == 3) { // x, y and z coordinate received.
 		 /* RCLCPP_INFO(this->get_logger(), "Published trajectory: [%.2f, %.2f, %.2f]",

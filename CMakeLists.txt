@@ -131,4 +131,9 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  src/examples/offboard_py/maneuver.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

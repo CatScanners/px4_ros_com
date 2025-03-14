@@ -1,6 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
+#include <px4_msgs/msg/vehicle_local_position.hpp>
 #include <chrono>
 #include <iostream>
 #include <cmath>
@@ -14,8 +15,17 @@ class TrajectoryPublisher : public rclcpp::Node
 public:
     TrajectoryPublisher() : Node("trajectory_publisher"), counter_(1), mission_count_(0), state_(FLY_LEFT_RIGHT)
     {
+
+        // rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
+        // qos_profile.depth = 100;
+        // qos_profile.reliability = RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT;
+
+        // auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 100), qos_profile);
+
         trajectory_publisher_ = this->create_publisher<TrajectorySetpoint>("/custom_trajectory", 10);
         vehicle_command_publisher_ = this->create_publisher<px4_msgs::msg::VehicleCommand>("/fmu/in/vehicle_command", 10);
+        // subscription_ = this->create_subscription<VehicleLocalPosition>("/fmu/out/vehicle_local_position", qos,std::bind(&TrajectoryPublisher::vehicle_local_position_callback, this, std::placeholders::_1));
+
         rclcpp::Logger logger = this->get_logger();
         RCLCPP_INFO(logger, "Trajectory Publisher Node Started.");
         // Publishes trajectory every 100ms.
@@ -25,16 +35,29 @@ public:
 private:
     enum MissionState { FLY_LEFT_RIGHT, FLY_FORWARD_BACKWARD, FLY_UP_DOWN, ROTATE, DONE };
     rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_publisher_;
-    rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_publisher_;
+    rclcpp::Publisher<VehicleCommand>::SharedPtr vehicle_command_publisher_;
+    rclcpp::Subscription<VehicleLocalPosition>::SharedPtr subscription_;
     rclcpp::TimerBase::SharedPtr timer_;
     int counter_;
     int mission_count_;
     MissionState state_;
     const int EACH_MOVE_COUNT = 30;
+    const int WAITING_TIME = 20;
+    /*VehicleLocalPosition current_position_;
+
+    void vehicle_local_position_callback(const VehicleLocalPosition::SharedPtr msg)
+    {
+        current_position_ = *msg;
+        RCLCPP_INFO(this->get_logger(), "Current Position - X: %f, Y: %f, Z: %f", 
+                current_position_.x, current_position_.y, current_position_.z);
+
+    }*/
 
     void publish_trajectory()
     {
         TrajectorySetpoint msg{};
+        RCLCPP_INFO(this->get_logger(), "Velocity: [%f, %f, %f]", msg.velocity[0], msg.velocity[1], msg.velocity[2]);
+        RCLCPP_INFO(this->get_logger(), "Acceleration: [%f, %f, %f]", msg.acceleration[0], msg.acceleration[1], msg.acceleration[2]);
 
         switch (state_)
         {
@@ -42,16 +65,22 @@ private:
                 if (counter_ == 1) {
                     RCLCPP_INFO(this->get_logger(), "'Fly left right'-mission.");
                 }
-                
+
                 if (counter_ < EACH_MOVE_COUNT) {
-                    msg.position = {0.0, -4.0, -5.0}; // Go left 4m.
-                } else if (counter_ < 2 * EACH_MOVE_COUNT) {
-                    msg.position = {0.0, 0.0, -5.0}; // Go right (go back).
+                    float progress = static_cast<float>(counter_) / EACH_MOVE_COUNT; // Scale from 0 to 1
+                    msg.position = {0.0f, -4.0f * progress, -5.0f}; // Fly left (west)
+                } else if ((EACH_MOVE_COUNT <= counter_) && (counter_ < EACH_MOVE_COUNT + WAITING_TIME)) { // Wait the value of "WAITING_TIME" before making new move.
+                    msg.position = {0.0f, -4.0f, -5.0f};
+                } else if (counter_ < 2 * EACH_MOVE_COUNT + WAITING_TIME) {
+                    float progress = static_cast<float>(counter_ - (EACH_MOVE_COUNT + WAITING_TIME)) / EACH_MOVE_COUNT;
+                    msg.position = {0.0f, -4.0f + 4.0f * progress, -5.0f};
+                } else {
+                    msg.position = {0.0f, 0.0f, -5.0f};
                 }
 
                 msg.yaw = -3.14;
 
-                if (counter_ >= 2 * EACH_MOVE_COUNT) {
+                if (counter_ >= 2 * EACH_MOVE_COUNT + 2 * WAITING_TIME) {
                     state_ = FLY_FORWARD_BACKWARD;
                     counter_ = 0;
                 }
@@ -64,14 +93,20 @@ private:
                 }
 
                 if (counter_ < EACH_MOVE_COUNT) {
-                    msg.position = {4.0, 0.0, -5.0}; // Fly forward (north)
-                } else if (counter_ < 2 * EACH_MOVE_COUNT) {
-                    msg.position = {0.0, 0.0, -5.0}; // Go back.
+                    float progress = static_cast<float>(counter_) / EACH_MOVE_COUNT;
+                    msg.position = {4.0f * progress, 0.0f, -5.0f}; // Fly forward (north)
+                } else if ((EACH_MOVE_COUNT <= counter_) && (counter_ < EACH_MOVE_COUNT + WAITING_TIME)) { // Wait the value of "WAITING_TIME" before making new move.
+                    msg.position = {4.0f, 0.0f, -5.0f};
+                } else if (counter_ < 2 * EACH_MOVE_COUNT + WAITING_TIME) {
+                    float progress = static_cast<float>(counter_ - (EACH_MOVE_COUNT + WAITING_TIME)) / EACH_MOVE_COUNT;
+                    msg.position = {4.0f - (4.0f * progress), 0.0f, -5.0f}; // Go back.
+                } else {
+                    msg.position = {0.0f, 0.0f, -5.0f}; // Wait in initial state.
                 }
 
                 msg.yaw = -3.14;
                 
-                if (counter_ >= 2 * EACH_MOVE_COUNT) {
+                if (counter_ >= 2 * EACH_MOVE_COUNT + 2 * WAITING_TIME) {
                     state_ = FLY_UP_DOWN;
                     counter_ = 0;
                 }
@@ -84,14 +119,20 @@ private:
                 }
                 
                 if (counter_ < EACH_MOVE_COUNT) {
-                    msg.position = {0.0, 0.0, -3.0}; // Go down.
-                } else if (counter_ < 2 * EACH_MOVE_COUNT) {
-                    msg.position = {0.0, 0.0, -5.0}; // Go up.
+                    float progress = static_cast<float>(counter_) / EACH_MOVE_COUNT;
+                    msg.position = {0.0f, 0.0f, -5.0f + (2.0f * progress)}; // Go down.
+                } else if ((EACH_MOVE_COUNT <= counter_) && (counter_ < EACH_MOVE_COUNT + WAITING_TIME)) { // Wait the value of "WAITING_TIME" before making new move.
+                    msg.position = {0.0f, 0.0f, -3.0f};
+                } else if (counter_ < 2 * EACH_MOVE_COUNT + WAITING_TIME) {
+                    float progress = static_cast<float>(counter_ - (EACH_MOVE_COUNT + WAITING_TIME)) / EACH_MOVE_COUNT;
+                    msg.position = {0.0f, 0.0f, -3.0f - (2.0f * progress)};
+                } else {
+                    msg.position = {0.0f, 0.0f, -5.0f}; // Wait in initial state.
                 }
-                
+
                 msg.yaw = -3.14;
 
-                if (counter_ >= 2 * EACH_MOVE_COUNT) {
+                if (counter_ >= 2 * EACH_MOVE_COUNT + 2 * WAITING_TIME) {
                     state_ = ROTATE;
                     counter_ = 0;
                 }
@@ -106,13 +147,19 @@ private:
                 msg.position = {0.0, 0.0, -5.0}; // Keep position constant
     
                 if (counter_ < EACH_MOVE_COUNT) {
-                    // Gradually increase yaw from -π to π (full rotation)
-                    msg.yaw = -M_PI + (2 * M_PI * counter_ / EACH_MOVE_COUNT);  // Full 360-degree rotation counterclockwise.
-                } else if (counter_ < 2 * EACH_MOVE_COUNT) {
-                    msg.yaw = M_PI - (2 * M_PI * counter_ / EACH_MOVE_COUNT);
-                }
-                
-                if (counter_ >= 2 * EACH_MOVE_COUNT) {
+                    // Gradually increase yaw from -π to π (full rotation counterclockwise)
+                    msg.yaw = -M_PI + (2 * M_PI * counter_ / EACH_MOVE_COUNT);
+                } else if ((EACH_MOVE_COUNT <= counter_) && (counter_ < EACH_MOVE_COUNT + WAITING_TIME)) { 
+                    // Wait at π for "WAITING_TIME"
+                    msg.yaw = M_PI;
+                } else if (counter_ < 2 * EACH_MOVE_COUNT + WAITING_TIME) {
+                    // Gradually decrease yaw from π to -π (full rotation clockwise)
+                    msg.yaw = M_PI - (2 * M_PI * (counter_ - EACH_MOVE_COUNT - WAITING_TIME) / EACH_MOVE_COUNT);
+                } else if ((2 * EACH_MOVE_COUNT + WAITING_TIME <= counter_) && (counter_ < 2 * EACH_MOVE_COUNT + 2 * WAITING_TIME)) {
+                    // Wait at -π for "WAITING_TIME" before repeating
+                    msg.yaw = -M_PI;
+                } else if (counter_ >= 2 * EACH_MOVE_COUNT + 2 * WAITING_TIME) {
+                    msg.yaw = -M_PI;
                     mission_count_++;
     
                     if (mission_count_ < 3) {
