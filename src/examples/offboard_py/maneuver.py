@@ -67,7 +67,7 @@ class Maneuver(Node):
             rclpy.spin_once(self, timeout_sec=self.break_time)
             time.sleep(3)
         
-        self.rotate(3.14, speed=speed)
+        self.rotate(6.28, speed=speed)
         self.rotate(0.0, speed=speed)
     
     def start_moving(self):
