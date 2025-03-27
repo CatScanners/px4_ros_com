@@ -77,10 +77,10 @@ class Maneuver(Node):
         motions = [
             (x + 3.0, y, z, yaw),
             (x, y, z, yaw),
-            (x, y, -5.0, yaw),
-            (x, y, -3.0, yaw),
-            (x, y + 3.0, -3.0, yaw),
-            (x, y, -3.0, yaw)
+            (x, y, z - 2.0, yaw),
+            (x, y, z, yaw),
+            (x, y + 3.0, z, yaw),
+            (x, y, z, yaw)
         ]
         s1 = 1.0
         s2 = 0.6
