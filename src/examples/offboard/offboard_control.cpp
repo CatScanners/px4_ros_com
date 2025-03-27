@@ -72,27 +72,27 @@
 		 custom_trajectory_subscription_ = this->create_subscription<TrajectorySetpoint>("/custom_trajectory", 10, std::bind(&OffboardControl::trajectory_setpoint_callback, this, std::placeholders::_1));
 		 subscription_ = this->create_subscription<VehicleLocalPosition>("/fmu/out/vehicle_local_position", qos,std::bind(&OffboardControl::vehicle_gps_callback, this, std::placeholders::_1));
 		 current_trajectory_setpoint_.position = {0.0f, 0.0f, -3.0f};
-		 offboard_setpoint_counter_ = 0;
+		 // offboard_setpoint_counter_ = 0;
  
 		 auto timer_callback = [this]() -> void {
  
 			 // Switch to offboard mode and armAFTER 10 trajectory setpoints have been sent.
 			 // https://docs.px4.io/main/en/ros2/offboard_control.html#:~:text=PX4%20requires%20that%20the%20vehicle%20is%20already%20receiving%20OffboardControlMode%20messages%20before
-			 if (offboard_setpoint_counter_ == 10) {
+			 /*if (offboard_setpoint_counter_ == 10) {
 				 // Change to Offboard mode after 10 setpoints
 				 this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
 				 // Arm the vehicle
 				 // this->arm();
-			 }
+			 }*/
  
 			 // offboard_control_mode needs to be paired with trajectory_setpoint
 			 publish_offboard_control_mode();
 			 publish_trajectory_setpoint();
  
 			 // stop the counter after reaching 11, no need to count anymore.
-			 if (offboard_setpoint_counter_ < 11) {
+			 /*if (offboard_setpoint_counter_ < 11) {
 				 offboard_setpoint_counter_++;
-			 }
+			 }*/
 		 };
  
 		 timer_ = this->create_wall_timer(100ms, timer_callback);
@@ -112,7 +112,7 @@
 	 rclcpp::Subscription<TrajectorySetpoint>::SharedPtr custom_trajectory_subscription_;
  
 	 std::atomic<uint64_t> timestamp_;   //!< common synced timestamped
-	 uint64_t offboard_setpoint_counter_;   //!< counter for the number of setpoints sent
+	 // uint64_t offboard_setpoint_counter_;   //!< counter for the number of setpoints sent
 	 TrajectorySetpoint current_trajectory_setpoint_; //!< next setpoint, where the drone should be.
 	 float current_trajectory_altitude_ = 0; // current trajectory setpoint that we are sending
 
